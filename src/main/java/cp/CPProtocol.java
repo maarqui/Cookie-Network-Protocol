@@ -73,8 +73,7 @@ public class CPProtocol extends Protocol {
     public Msg receive() throws IOException, IWProtocolException {
         if (this.lastSentCommand == null) {
             // not supposed to happen if send() is called before
-            throw new IWProtocolException();
-            // "receive() called before send()"
+            throw new NoNextStateException("receive() called before send()");
         }
 
         // Implement receive method:
@@ -86,11 +85,7 @@ public class CPProtocol extends Protocol {
 
             // validate that the message is from the correct protocol (CP)
             if (((PhyConfiguration) in.getConfiguration()).getPid() != proto_id.CP) {
-                // Si no, ignorar y re-intentar... pero por simplicidad
-                // lanzamos una excepción o devolvemos null.
-                // Aquí lanzamos excepción.
-                throw new IWProtocolException();
-                // "Received message for wrong protocol"
+                throw new IllegalMsgException("Received message for wrong protocol");
             }
 
             // call parser
@@ -99,21 +94,20 @@ public class CPProtocol extends Protocol {
 
             // verify if response is CPCommandResponseMsg
             if (!(cpmIn instanceof CPCommandResponseMsg)) {
-                throw new IWProtocolException();
-                // "Unexpected message type received"
+                throw new IllegalMsgException("Unexpected message type received");
             }
 
             CPCommandResponseMsg response = (CPCommandResponseMsg) cpmIn;
 
             // verify ID
             if (response.getId() != this.lastSentCommand.getId()) {
-                throw new IWProtocolException();
-                // "Response ID mismatch"
+                throw new IllegalMsgException("Response ID mismatch. Expected: " +
+                        lastSentCommand.getId() + ", Got: " + response.getId());
             }
 
             // verify success
             if (!response.isSuccess()) {
-                throw new IWProtocolException();
+                throw new IllegalCommandException("Server rejected command: " + response.getResponseMessage());
                 // "Server rejected command: " + response.getResponseMessage()
             }
 
@@ -129,9 +123,8 @@ public class CPProtocol extends Protocol {
             return response;
 
         } catch (SocketTimeoutException e) {
-            // the server didnt respond in CP_TIMEOUT time
-            throw new IWProtocolException();
-            // "Server timeout"
+            // the server didn't respond in CP_TIMEOUT time
+            throw new CookieTimeoutException("Server timeout");
         }
     }
 
