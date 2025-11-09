@@ -57,7 +57,7 @@ public class CPProtocol extends Protocol {
 
     @Override
     public void send(String s, Configuration config) throws IOException, IWProtocolException {
-        CPCommandMsg msg= new CPCommandMsg();
+        // 's' is the raw user command
 
         if (cookie < 0) {
             // Request a new cookie from server
@@ -65,8 +65,24 @@ public class CPProtocol extends Protocol {
             requestCookie();
         }
 
-        // Task 1.2.1: complete send method
+        // Send implementation
 
+        // increment ID
+        this.id++;
+        // manage overflow (wrap-around)
+        if (this.id > 65535) {
+            this.id = 1; // restart in case the max is reached
+        }
+
+        // create CPCommandMsg object to create the message
+        CPCommandMsg msg = new CPCommandMsg();
+        msg.create(s, this.id, this.cookie);
+
+        // save sent message for verification
+        this.lastSentCommand = msg;
+
+        // send the command to the command server
+        this.PhyProto.send(new String(msg.getDataBytes()), this.PhyConfigCommandServer);
     }
 
     @Override
