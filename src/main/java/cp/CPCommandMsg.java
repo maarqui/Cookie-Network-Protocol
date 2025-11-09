@@ -1,5 +1,114 @@
 package cp;
 
-public class CPCommandMsg {
-    // Class that stores the contents of the commands sent by the user
+import core.Msg;
+import exceptions.IllegalMsgException;
+import java.util.zip.CRC32;
+
+// Class that stores the contents of the commands sent by the user
+public class CPCommandMsg extends CPMsg{
+
+    protected static final String CP_CMD_HEADER =  "command";
+
+    // message fields
+    private int id;
+    private int cookie;
+    private int length;
+    private String command;
+    private String message;
+    private long checksum;
+
+    // empty constructor
+    public CPCommandMsg() {}
+
+    @Override
+    protected void create(String sentence) {
+        // simple create version to inherit from Msg
+        this.data = sentence;
+        this.dataBytes = sentence.getBytes();
+    }
+
+    /**
+     * Create command method: constructor to assemble a complete command message
+     * @param s raw command from user
+     * @param id exclusive id of the command
+     * @param cookie cookie obtained by the server
+     */
+    public void create(String s, int id, int cookie) {
+        this.id = id;
+        this.cookie = cookie;
+        this.message = ""; // by default the command message is empty
+
+        // analyze the contents of the command ("s")
+        if (s.startsWith("print")) {
+            this.command = "print";
+            // extract the text to print (assuming the text to print begins on the 6th char)
+            if (s.length() > 6) {
+                this.message = s.substring(6);
+            }
+        } else if (s.equals("status")) {
+            this.command = "status";
+            // for the status command the field message is not necessary
+        } else {
+            // unknown command filter
+            this.command = s;
+        }
+
+        // Calculate length:
+        // command field + optional message field
+        this.length = this.command.length();
+        if (!this.message.isEmpty()) {
+            this.length += this.message.length();
+        }
+
+        // Assembling the message for the checksum:
+        // checksum is calculated over all message fields except the cp field
+        String checksumData;
+        if (this.message.isEmpty()) {
+            // 'empty message' format
+            checksumData = String.format("%s %d %d %d %s",
+                    CP_CMD_HEADER, this.id, this.cookie, this.length, this.command);
+        } else {
+            // 'complete command' message
+            checksumData = String.format("%s %d %d %d %s %s",
+                    CP_CMD_HEADER, this.id, this.cookie, this.length, this.command, this.message);
+        }
+
+        // Calculate the checksum using CRC32: (https://docs.oracle.com/javase/9/docs/api/java/util/zip/CRC32.html)
+        CRC32 crc = new CRC32();
+        crc.update(checksumData.getBytes()); // generates the checksum using the bytes of the message previously assembled
+        this.checksum = crc.getValue();
+
+        // Assemble the final string (command data + checksum)
+        String finalMsg = String.format("%s %d", checksumData, this.checksum);
+
+        // Call super.create()
+        super.create(finalMsg);
+    }
+
+
+     // Getter for ID
+    public int getId() {
+        return this.id;
+    }
+
+     // Parse method (not used but needed because of inheritance)
+    @Override
+    protected Msg parse(String sentence) throws IllegalMsgException {
+        if (!sentence.startsWith(CP_CMD_HEADER)) {
+            throw new IllegalMsgException();
+            // "Not a command message"
+        }
+
+        String[] parts = sentence.split("\\s+");
+        // format: command (id) (cookie) (length) (command) [message] (checksum)
+        if (parts.length < 6) { // 6 parts minimum (the message is not optional)
+            throw new IllegalMsgException();
+            // "Invalid format: parts of the format are missing"
+        }
+
+        // ... (future logic and validation for user)
+        return this;
+    }
+
+
 }
