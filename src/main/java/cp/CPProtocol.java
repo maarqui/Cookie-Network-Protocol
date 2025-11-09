@@ -83,8 +83,9 @@ public class CPProtocol extends Protocol {
     // Only CookieCommandMsg are processed, all others are ignored
     private Msg command_process(CPMsg cpmIn) throws IWProtocolException {
         CPCommandMsg stored = null;
+        Msg msg = null;     // Placeholder
 
-        return stored;
+        return msg;
     }
 
 
