@@ -15,6 +15,7 @@ public class CPCommandResponseMsg extends CPMsg {
     private int length;
     private String responseMessage;
     private long receivedChecksum;
+    protected static final String CP_CMD_RES_HEADER = "command_response";
 
 
      // Create method (not used but needed because of the inheritance)
@@ -95,11 +96,8 @@ public class CPCommandResponseMsg extends CPMsg {
 
             // verify length
             if (this.responseMessage.length() != this.length) {
-                // Esto podría pasar si el mensaje tiene espacios al inicio/final
-                // que fueron eliminados por el split.
-                // Una implementación más robusta buscaría el inicio
-                // del 'message' en la cadena 'dataPart' original.
-                // Por ahora, asumimos que 'split' es suficiente.
+                // if statement to correct spaces before and after the command supposed to be corrected by split()
+                throw new IllegalMsgException();
             }
 
         } else if (this.length > 0 && parts.length < 5) {
@@ -108,6 +106,16 @@ public class CPCommandResponseMsg extends CPMsg {
         }
 
         return this;
+    }
+    // Getters (needed for receive() in CPProtocol)
+    public int getId() {
+        return this.id;
+    }
+    public boolean isSuccess() {
+        return this.success;
+    }
+    public String getResponseMessage() {
+        return this.responseMessage;
     }
 
 }

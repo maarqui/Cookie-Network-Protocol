@@ -24,6 +24,7 @@ public class CPProtocol extends Protocol {
     HashMap<PhyConfiguration, Cookie> cookieMap;
     ArrayList<CPCommandMsg> pendingCommands;
     Random rnd;
+    private CPCommandMsg lastSentCommand;
 
     private enum cp_role {
         CLIENT, COOKIE, COMMAND
@@ -70,13 +71,68 @@ public class CPProtocol extends Protocol {
 
     @Override
     public Msg receive() throws IOException, IWProtocolException {
-        CPMsg cpmIn = null;
+        if (this.lastSentCommand == null) {
+            // not supposed to happen if send() is called before
+            throw new IWProtocolException();
+            // "receive() called before send()"
+        }
 
-        // Task 1.2.1: implement receive method
+        // Implement receive method:
 
-        // Task 2.1.1: enhance receive method
+        // Wait 2s (CP_TIMEOUT) for the server response
+        try {
+            // call receive from the physical layer
+            Msg in = this.PhyProto.receive(CP_TIMEOUT);
 
-        return cpmIn;
+            // validate that the message is from the correct protocol (CP)
+            if (((PhyConfiguration) in.getConfiguration()).getPid() != proto_id.CP) {
+                // Si no, ignorar y re-intentar... pero por simplicidad
+                // lanzamos una excepción o devolvemos null.
+                // Aquí lanzamos excepción.
+                throw new IWProtocolException();
+                // "Received message for wrong protocol"
+            }
+
+            // call parser
+            CPMsg cpmIn = new CPMsg(); // temporal object to call parse() from CPMsg
+            cpmIn = (CPMsg) cpmIn.parse(in.getData());
+
+            // verify if response is CPCommandResponseMsg
+            if (!(cpmIn instanceof CPCommandResponseMsg)) {
+                throw new IWProtocolException();
+                // "Unexpected message type received"
+            }
+
+            CPCommandResponseMsg response = (CPCommandResponseMsg) cpmIn;
+
+            // verify ID
+            if (response.getId() != this.lastSentCommand.getId()) {
+                throw new IWProtocolException();
+                // "Response ID mismatch"
+            }
+
+            // verify success
+            if (!response.isSuccess()) {
+                throw new IWProtocolException();
+                // "Server rejected command: " + response.getResponseMessage()
+            }
+
+            // return to client:
+            // success. data message is returned by CPClient.
+            // rewrite 'data' for 'message' (the one that the client wants to see)
+            if (response.getResponseMessage().isEmpty()) {
+                response.setData("Server: OK");
+            } else {
+                response.setData(response.getResponseMessage());
+            }
+
+            return response;
+
+        } catch (SocketTimeoutException e) {
+            // the server didnt respond in CP_TIMEOUT time
+            throw new IWProtocolException();
+            // "Server timeout"
+        }
     }
 
     // CookieServer processing of incoming messages
