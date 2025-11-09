@@ -91,10 +91,7 @@ public class CPCommandMsg extends CPMsg{
         return this.id;
     }
 
-    /**
-     * Parse method:
-     * used by the server to read the messages
-     */
+     // Parse method (not used but needed because of inheritance)
     @Override
     protected Msg parse(String sentence) throws IllegalMsgException {
         if (!sentence.startsWith(CP_CMD_HEADER)) {
