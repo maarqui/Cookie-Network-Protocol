@@ -3,6 +3,7 @@
 ## **task 1**
 
 **subtask 1.1** - Document protocol stack initialization and the cookie request method all the way until a cookie is available to the client or the request got rejected.
+
 ![cookie-protocol-diagram](cookie-protocol-diagram.png)
 
 **subtask 1.2** - Completion of client methods:
@@ -29,6 +30,7 @@
    - _implementation on processing of premature cookie renewal_
         - _document decision_
    - _implementation of apropriate response messages from server_
+
 
 
 
