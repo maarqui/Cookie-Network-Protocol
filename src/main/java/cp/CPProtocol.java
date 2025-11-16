@@ -13,7 +13,7 @@ import java.util.HashMap;
 import java.util.Random;
 
 public class CPProtocol extends Protocol {
-    private static final int CP_TIMEOUT = 2000;
+    private static final int CP_TIMEOUT = 3000;
     private static final int CP_HASHMAP_SIZE = 20;
     private int cookie;
     private int id;
@@ -65,11 +65,9 @@ public class CPProtocol extends Protocol {
             requestCookie();
         }
 
-        // Send implementation
-
         // increment ID
         this.id++;
-        // manage overflow (wrap-around)
+        // manage overflow
         if (this.id > 65535) {
             this.id = 1; // restart in case the max is reached
         }
@@ -92,65 +90,55 @@ public class CPProtocol extends Protocol {
             throw new NoNextStateException("receive() called before send()");
         }
 
-        // Implement receive method:
+        int count = 0;
+        while (count < 3) {
+            try {
+                // call receive from the physical layer
+                Msg in = this.PhyProto.receive(CP_TIMEOUT);
 
-        // Wait 2s (CP_TIMEOUT) for the server response
-        try {
-            // call receive from the physical layer
-            Msg in = this.PhyProto.receive(CP_TIMEOUT);
+                // validate that the message is from the correct protocol (CP)
+                if (((PhyConfiguration) in.getConfiguration()).getPid() != proto_id.CP) {
+                    continue; // package for a different protocol, ignore and keep waiting
+                }
 
-            // validate that the message is from the correct protocol (CP)
-            if (((PhyConfiguration) in.getConfiguration()).getPid() != proto_id.CP) {
-                throw new IllegalMsgException("Received message for wrong protocol");
+                // call parser
+                CPMsg cpmIn = new CPMsg();
+                cpmIn = (CPMsg) cpmIn.parse(in.getData());
+
+                // verify if response is CPCommandResponseMsg
+                if (!(cpmIn instanceof CPCommandResponseMsg response)) {
+                    continue; // not a command response, ignore
+                }
+
+                // verify ID
+                if (response.getId() != this.lastSentCommand.getId()) {
+                    continue; // If incorrect ID wait for the correct response
+                }
+
+                // verify success
+                if (!response.isSuccess()) {
+                    // if the server throws error
+                    throw new IllegalCommandException("Server rejected command: " + response.getResponseMessage());
+                }
+
+                // return to client
+                if (response.getResponseMessage().isEmpty()) {
+                    response.setData("Server: OK");
+                } else {
+                    response.setData(response.getResponseMessage());
+                }
+
+                return response; // return exit response
+
+            } catch (SocketTimeoutException e) {
+                // if timeout exception is reached increment count and continue
+                count += 1;
+            } catch (IWProtocolException e) {
+                // catches exceptions
             }
-
-            // call parser
-            CPMsg cpmIn = new CPMsg(); // temporal object to call parse() from CPMsg
-            cpmIn = (CPMsg) cpmIn.parse(in.getData());
-
-            // verify if response is CPCommandResponseMsg
-            if (!(cpmIn instanceof CPCommandResponseMsg)) {
-                throw new IllegalMsgException("Unexpected message type received");
-            }
-
-            CPCommandResponseMsg response = (CPCommandResponseMsg) cpmIn;
-
-            // verify ID
-            if (response.getId() != this.lastSentCommand.getId()) {
-                throw new IllegalMsgException("Response ID mismatch. Expected: " +
-                        lastSentCommand.getId() + ", Got: " + response.getId());
-            }
-
-            // verify success
-            if (!response.isSuccess()) {
-                throw new IllegalCommandException("Server rejected command: " + response.getResponseMessage());
-                // "Server rejected command: " + response.getResponseMessage()
-            }
-
-            // return to client:
-            // success. data message is returned by CPClient.
-            // rewrite 'data' for 'message' (the one that the client wants to see)
-            if (response.getResponseMessage().isEmpty()) {
-                response.setData("Server: OK");
-            } else {
-                response.setData(response.getResponseMessage());
-            }
-
-            return response;
-
-        } catch (SocketTimeoutException e) {
-            // the server didn't respond in CP_TIMEOUT time
-            throw new CookieTimeoutException("Server timeout");
         }
-    }
-
-    // CookieServer processing of incoming messages
-    // Only CookieCommandMsg are processed, all others are ignored
-    private Msg command_process(CPMsg cpmIn) throws IWProtocolException {
-        CPCommandMsg stored = null;
-        Msg msg = null;     // Placeholder
-
-        return msg;
+        // if loop ends, throw server timeout
+        throw new CookieTimeoutException("Server timeout (3 attempts of 3s each)");
     }
 
 
