@@ -4,13 +4,14 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 
 import core.*;
 import exceptions.*;
 
 public class PhyProtocol extends Protocol {
 	protected DatagramSocket socket;
-	
+
 	/*
 	 * Create a new PhyProtocol instance connected to UDP port provided
 	 */
@@ -34,7 +35,7 @@ public class PhyProtocol extends Protocol {
 		// Call actual send method
 		this.send(m);
 	}
-	
+
 	public void send(PhyMsg m) throws IOException {
 		// Create UDP packet
 		DatagramPacket sendPacket = new DatagramPacket(m.getDataBytes(), m.getLength(),
@@ -43,42 +44,49 @@ public class PhyProtocol extends Protocol {
 		// send UDP packet
 		socket.send(sendPacket);
 	}
-	
+
 	/*
 	 * receive incoming message from socket and parse -> call blocks on socket until message is received
 	 * return Msg object to caller
 	 */
-	@Override
-	public Msg receive() throws IOException {
-		// read from UDP socket
-		// data and meta-data contained in receivedPacket object
-		byte[] receiveData = new byte[1024];
-		DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-		socket.receive(receivePacket);
+    /*
+     * receive incoming message from socket and parse -> call blocks on socket until message is received
+     * return Msg object to caller
+     */
+    @Override
+    public Msg receive() throws IOException, IllegalMsgException {
+        // read from UDP socket
+        // data and meta-data contained in receivedPacket object
+        byte[] receiveData = new byte[1024];
+        DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+        socket.receive(receivePacket);
 
-		// create msg object for parsing
-		PhyMsg in = new PhyMsg();
-		// get data from packet data
-		String sentence = new String(receivePacket.getData()).trim();
-		try {
-			// parse data to check if message is compliant with protocol specification
-			in = (PhyMsg) in.parse(sentence);
-		} catch (IllegalMsgException e) {
-			e.printStackTrace();
-		}
-		// create a config object from packet meta-data
-		PhyConfiguration config = new PhyConfiguration(receivePacket.getAddress(), receivePacket.getPort(), in.getPid());
-		in.setConfiguration(config);
+        // create msg object for parsing
 
-		// if message was parsed correctly object is returned to caller  
-		return in;
-	}
-	
-	/*
+        // if message was parsed correctly object is returned to caller
+        return parseMsg(receivePacket);
+    }
+
+    // extracted method for cleaner implementation
+    private static PhyMsg parseMsg(DatagramPacket receivePacket) throws IllegalMsgException, UnknownHostException {
+        PhyMsg in = new PhyMsg();
+        // get data from packet data
+        String sentence = new String(receivePacket.getData()).trim();
+        // 'try-catch' removed, parse method handles the exceptions
+        // parse data to check if message is compliant with protocol specification
+        in = (PhyMsg) in.parse(sentence);
+        
+        // create a config object from packet meta-data
+        PhyConfiguration config = new PhyConfiguration(receivePacket.getAddress(), receivePacket.getPort(), in.getPid());
+        in.setConfiguration(config);
+        return in;
+    }
+
+    /*
 	 * wrapper method to basic receive method -> call blocks on socket until message is received or 
 	 * timeout expires and exception is raised
 	 */
-	public Msg receive(int timeout) throws IOException {
+	public Msg receive(int timeout) throws IOException, IllegalMsgException {
 		socket.setSoTimeout(timeout);
 		Msg in;
 		in = receive();
