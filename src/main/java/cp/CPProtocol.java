@@ -96,7 +96,7 @@ public class CPProtocol extends Protocol {
                 // call receive from the physical layer
                 Msg in = this.PhyProto.receive(CP_TIMEOUT);
 
-                // b. validate that the message is from the correct protocol (CP)
+                // validate that the message is from the correct protocol (CP)
                 if (((PhyConfiguration) in.getConfiguration()).getPid() != proto_id.CP) {
                     continue; // package for a different protocol, ignore and keep waiting
                 }
@@ -137,7 +137,7 @@ public class CPProtocol extends Protocol {
                 // catches exceptions
             }
         }
-        // if loop ends, the attempts ran out
+        // if loop ends, throw server timeout
         throw new CookieTimeoutException("Server timeout (3 attempts of 3s each)");
     }
 
