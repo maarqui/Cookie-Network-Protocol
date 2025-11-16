@@ -92,9 +92,8 @@ public class CPProtocol extends Protocol {
             throw new NoNextStateException("receive() called before send()");
         }
 
-        // Implement receive method:
-
-        // Wait 2s (CP_TIMEOUT) for the server response
+        // Implementation:
+        // Wait 3s (CP_TIMEOUT) for the server response
         try {
             // call receive from the physical layer
             Msg in = this.PhyProto.receive(CP_TIMEOUT);
