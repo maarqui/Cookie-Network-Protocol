@@ -85,66 +85,129 @@ public class CPProtocol extends Protocol {
 
     @Override
     public Msg receive() throws IOException, IWProtocolException {
-        if (this.lastSentCommand == null) {
-            // not supposed to happen if send() is called before
-            throw new NoNextStateException("receive() called before send()");
-        }
-
-        int count = 0;
-        while (count < 3) {
-            try {
-                // call receive from the physical layer
-                Msg in = this.PhyProto.receive(CP_TIMEOUT);
-
-                // validate that the message is from the correct protocol (CP)
-                if (((PhyConfiguration) in.getConfiguration()).getPid() != proto_id.CP) {
-                    continue; // package for a different protocol, ignore and keep waiting
-                }
-
-                // call parser
-                CPMsg cpmIn = new CPMsg();
-                cpmIn = (CPMsg) cpmIn.parse(in.getData());
-
-                // verify if response is CPCommandResponseMsg
-                if (!(cpmIn instanceof CPCommandResponseMsg response)) {
-                    continue; // not a command response, ignore
-                }
-
-                // verify ID
-                if (response.getId() != this.lastSentCommand.getId()) {
-                    continue; // If incorrect ID wait for the correct response
-                }
-
-                // verify success
-                if (!response.isSuccess()) {
-                    // if the server throws error
-                    throw new IllegalCommandException("Server rejected command: " + response.getResponseMessage());
-                }
-
-                // return to client
-                if (response.getResponseMessage().isEmpty()) {
-                    response.setData("Server: OK");
-                } else {
-                    response.setData(response.getResponseMessage());
-                }
-
-                return response; // return exit response
-
-            } catch (SocketTimeoutException e) {
-                // if timeout exception is reached increment count and continue
-                count += 1;
-            } catch (IWProtocolException e) {
-                // catches exceptions
+        // Ramification of server/client logics:
+        if(this.role == cp_role.CLIENT) {
+            // Client logic:
+            if (this.lastSentCommand == null) {
+                // not supposed to happen if send() is called before
+                throw new NoNextStateException("receive() called before send()");
             }
-        }
-        // if loop ends, throw server timeout
-        throw new CookieTimeoutException("Server timeout (3 attempts of 3s each)");
-    }
 
+            int count = 0;
+            while (count < 3) {
+                try {
+                    // call receive from the physical layer
+                    Msg in = this.PhyProto.receive(CP_TIMEOUT);
+
+                    // validate that the message is from the correct protocol (CP)
+                    if (((PhyConfiguration) in.getConfiguration()).getPid() != proto_id.CP) {
+                        continue; // package for a different protocol, ignore and keep waiting
+                    }
+
+                    // call parser
+                    CPMsg cpmIn = new CPMsg();
+                    cpmIn = (CPMsg) cpmIn.parse(in.getData());
+
+                    // verify if response is CPCommandResponseMsg
+                    if (!(cpmIn instanceof CPCommandResponseMsg response)) {
+                        continue; // not a command response, ignore
+                    }
+
+                    // verify ID
+                    if (response.getId() != this.lastSentCommand.getId()) {
+                        continue; // If incorrect ID wait for the correct response
+                    }
+
+                    // verify success
+                    if (!response.isSuccess()) {
+                        // if the server returns error, throw exception
+                        throw new IllegalCommandException("Server rejected command: " + response.getResponseMessage());
+                    }
+
+                    // return to client
+                    if (response.getResponseMessage().isEmpty()) {
+                        response.setData("Server: OK");
+                    } else {
+                        response.setData(response.getResponseMessage());
+                    }
+
+                    return response; // return exit response
+
+                } catch (SocketTimeoutException e) {
+                    // if timeout exception is reached increment count and continue
+                    count += 1;
+                } catch (IllegalMsgException e) {
+                    // catches illegal message exceptions
+                }
+            }
+            // if loop ends, throw server timeout
+            throw new CookieTimeoutException("Server timeout (3 attempts of 3s each)");
+        }else {
+            // Server logic:
+            Msg in = this.PhyProto.receive();
+
+            // validate if package is for this protocol
+            if (((PhyConfiguration) in.getConfiguration()).getPid() != proto_id.CP) {
+                return null; // if not, ignore package
+            }
+
+            // parse message
+            CPMsg cpmIn;
+            try {
+                CPMsg parser = new CPMsg();
+                cpmIn = (CPMsg) parser.parse(in.getData());
+                cpmIn.setConfiguration(in.getConfiguration());
+            } catch (IWProtocolException e) {
+                return null;
+            }
+
+            // ramification of processing methods:
+            if (this.role == cp_role.COOKIE) {
+                // cookie server processing method
+                if (cpmIn instanceof CPCookieRequestMsg) {
+                    // process cookie
+                    cookie_process(cpmIn);
+                }
+
+            } else if (this.role == cp_role.COMMAND) {
+                // command server processing method
+                if (cpmIn instanceof CPCommandMsg) {
+                    // process command
+                    // TODO: command_process(cpmIn);
+                }
+            }
+
+            return cpmIn; // return the message
+        }
+    }
 
     // Processing of the CookieRequestMsg
     private void cookie_process(CPMsg cpmIn) throws IWProtocolException, IOException {
+        // Obtain client config:
+        PhyConfiguration clientConfig = (PhyConfiguration) cpmIn.getConfiguration();
+        CPCookieResponseMsg resMsg;
 
+        // if server full, reject request:
+        if (cookieMap.size() >= CP_HASHMAP_SIZE) {
+            resMsg = new CPCookieResponseMsg(false); // success = false
+            resMsg.create("Server full");
+        } else {
+
+            // If client already exists, their cookie overwrites invalidating the old one:
+            // generate new cookie
+            int newCookieValue = rnd.nextInt(Integer.MAX_VALUE);
+            Cookie cookie = new Cookie(System.currentTimeMillis(), newCookieValue);
+
+            // store new cookie with put() so it overwrites if one already exists for that client.
+            cookieMap.put(clientConfig, cookie);
+
+            // return ACK
+            resMsg = new CPCookieResponseMsg(true); // success = true
+            resMsg.create("New cookie created: " + newCookieValue);
+        }
+
+        // return the response to the client
+        this.PhyProto.send(new String(resMsg.getDataBytes()), clientConfig);
     }
 
 
