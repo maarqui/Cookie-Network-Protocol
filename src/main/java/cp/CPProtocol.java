@@ -99,6 +99,10 @@ public class CPProtocol extends Protocol {
                     // call receive from the physical layer
                     Msg in = this.PhyProto.receive(CP_TIMEOUT);
 
+                    // validation of corrupt packages sent by PhyProtocol in case of exception
+                    if (in == null) {
+                        continue;
+                    }
                     // validate that the message is from the correct protocol (CP)
                     if (((PhyConfiguration) in.getConfiguration()).getPid() != proto_id.CP) {
                         continue; // package for a different protocol, ignore and keep waiting
