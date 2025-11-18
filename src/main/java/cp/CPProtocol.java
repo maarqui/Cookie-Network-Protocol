@@ -120,7 +120,7 @@ public class CPProtocol extends Protocol {
 
                     // verify success
                     if (!response.isSuccess()) {
-                        // if the server throws error
+                        // if the server returns error, throw exception
                         throw new IllegalCommandException("Server rejected command: " + response.getResponseMessage());
                     }
 
@@ -136,8 +136,8 @@ public class CPProtocol extends Protocol {
                 } catch (SocketTimeoutException e) {
                     // if timeout exception is reached increment count and continue
                     count += 1;
-                } catch (IWProtocolException e) {
-                    // catches exceptions
+                } catch (IllegalMsgException e) {
+                    // catches illegal message exceptions
                 }
             }
             // if loop ends, throw server timeout
@@ -175,10 +175,8 @@ public class CPProtocol extends Protocol {
                     // process command
                     // TODO: command_process(cpmIn);
                 }
-                // (Ignorar otros tipos)
             }
-
-            return cpmIn; // Devolver el mensaje procesado (o null si se ignoró)
+            return cpmIn; // return the message
         }
     }
 
