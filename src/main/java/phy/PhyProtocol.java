@@ -54,17 +54,20 @@ public class PhyProtocol extends Protocol {
      * return Msg object to caller
      */
     @Override
-    public Msg receive() throws IOException, IllegalMsgException {
+    public Msg receive() throws IOException {
         // read from UDP socket
         // data and meta-data contained in receivedPacket object
         byte[] receiveData = new byte[1024];
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
         socket.receive(receivePacket);
 
-        // create msg object for parsing
-
         // if message was parsed correctly object is returned to caller
-        return parseMsg(receivePacket);
+        try {
+            return parseMsg(receivePacket);
+        } catch (IllegalMsgException e) {
+            // catch the exception and return null
+            return null;
+        }
     }
 
     // extracted method for cleaner implementation
@@ -86,11 +89,9 @@ public class PhyProtocol extends Protocol {
 	 * wrapper method to basic receive method -> call blocks on socket until message is received or 
 	 * timeout expires and exception is raised
 	 */
-	public Msg receive(int timeout) throws IOException, IllegalMsgException {
+	public Msg receive(int timeout) throws IOException {
 		socket.setSoTimeout(timeout);
-		Msg in;
-		in = receive();
-
+		Msg in = receive();
 		socket.setSoTimeout(0);
 		return in;
 	}
