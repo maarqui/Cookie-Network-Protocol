@@ -88,10 +88,10 @@ public class CPProtocol extends Protocol {
         // Ramification of server/client logics:
         if(this.role == cp_role.CLIENT) {
             // Client logic:
-            if (this.lastSentCommand == null) {
+            /* if (this.lastSentCommand == null) {
                 // not supposed to happen if send() is called before
                 throw new NoNextStateException("receive() called before send()");
-            }
+            }*/
 
             int count = 0;
             while (count < 3) {
@@ -117,8 +117,8 @@ public class CPProtocol extends Protocol {
                         continue; // not a command response, ignore
                     }
 
-                    // verify ID
-                    if (response.getId() != this.lastSentCommand.getId()) {
+                    // verify ID if command is not null
+                    if (lastSentCommand != null && response.getId() != this.lastSentCommand.getId()) {
                         continue; // If incorrect ID wait for the correct response
                     }
 
@@ -196,7 +196,17 @@ public class CPProtocol extends Protocol {
             resMsg.create("Server full");
         } else {
 
-            // If client already exists, their cookie overwrites invalidating the old one:
+            /*
+             * Improved explanation regarding cookie renewal (as requested in feedback):
+             *
+             * DECISION: Allow premature cookie renewal by overwriting the old entry.
+             * REASONING: According to the specification, any previously issued cookie
+             * for a client must be invalidated when a new one is requested. By using
+             * cookieMap.put(), the old Cookie object (including its old timestamp) is
+             * replaced, effectively invalidating the previous session without requiring
+             * complex state checks, keeping the server stateless regarding history.
+             */
+
             // generate new cookie
             int newCookieValue = rnd.nextInt(Integer.MAX_VALUE);
             Cookie cookie = new Cookie(System.currentTimeMillis(), newCookieValue);
@@ -206,7 +216,7 @@ public class CPProtocol extends Protocol {
 
             // return ACK
             resMsg = new CPCookieResponseMsg(true); // success = true
-            resMsg.create("New cookie created: " + newCookieValue);
+            resMsg.create(Integer.toString(newCookieValue));
         }
 
         // return the response to the client
