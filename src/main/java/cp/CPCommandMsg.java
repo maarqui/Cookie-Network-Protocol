@@ -85,30 +85,42 @@ public class CPCommandMsg extends CPMsg{
         super.create(finalMsg);
     }
 
+    @Override
+    protected Msg parse(String sentence) throws IllegalMsgException {
+        // separate checksum, if not found throw exception
+        int checksumSeparatorIndex = sentence.lastIndexOf(' ');
+        if (checksumSeparatorIndex == -1) throw new IllegalMsgException("No checksum");
 
-     // Getter for ID
+        String dataPart = sentence.substring(0, checksumSeparatorIndex);
+        String checksumStr = sentence.substring(checksumSeparatorIndex + 1);
+
+        // validate checksum
+        CRC32 crc = new CRC32();
+        crc.update(dataPart.getBytes());
+        if (Long.parseLong(checksumStr) != crc.getValue()) {
+            throw new IllegalMsgException("Checksum error");
+        }
+
+        // format: command (id) (cookie) (length) (command) [message] (checksum)
+        String[] parts = dataPart.split("\\s+", 6);
+        // 5 parts minimum (checksum separated)
+        if (parts.length < 5) throw new IllegalMsgException("Invalid command format");
+
+        this.id = Integer.parseInt(parts[1]);
+        this.cookie = Integer.parseInt(parts[2]);
+        this.length = Integer.parseInt(parts[3]);
+        this.command = parts[4];
+        this.message = (parts.length == 6) ? parts[5] : "";
+
+        return this;
+    }
+
     public int getId() {
         return this.id;
     }
-
-     // Parse method (not used but needed because of inheritance)
-    @Override
-    protected Msg parse(String sentence) throws IllegalMsgException {
-        if (!sentence.startsWith(CP_CMD_HEADER)) {
-            throw new IllegalMsgException();
-            // "Not a command message"
-        }
-
-        String[] parts = sentence.split("\\s+");
-        // format: command (id) (cookie) (length) (command) [message] (checksum)
-        if (parts.length < 6) { // 6 parts minimum (the message is not optional)
-            throw new IllegalMsgException();
-            // "Invalid format: parts of the format are missing"
-        }
-
-        // ... (future logic and validation for user)
-        return this;
-    }
+    public int getCookie() { return this.cookie; }
+    public String getCommand() { return this.command; }
+    public String getMessage() { return this.message; }
 
 
 }

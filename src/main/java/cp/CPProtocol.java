@@ -177,7 +177,7 @@ public class CPProtocol extends Protocol {
                 // command server processing method
                 if (cpmIn instanceof CPCommandMsg) {
                     // process command
-                    // TODO: command_process(cpmIn);
+                    command_process(cpmIn);
                 }
             }
             return cpmIn; // return the message
@@ -223,6 +223,19 @@ public class CPProtocol extends Protocol {
         this.PhyProto.send(new String(resMsg.getDataBytes()), clientConfig);
     }
 
+    // Processing of commands received
+    private void command_process(CPMsg cpmIn) throws IOException, IWProtocolException {
+        CPCommandMsg cmd = (CPCommandMsg) cpmIn;
+
+        // print when command is received
+        System.out.println("COMMAND RECEIVED: " + cmd.getCommand() + " " + cmd.getMessage());
+
+        CPCommandResponseMsg res = new CPCommandResponseMsg();
+        res.create(cmd.getId(), true, "Command executed");
+
+        // send response to client
+        this.PhyProto.send(new String(res.getDataBytes()), (PhyConfiguration) cmd.getConfiguration());
+    }
 
     // Method for the client to request a cookie
     public void requestCookie() throws IOException, IWProtocolException {
@@ -248,8 +261,7 @@ public class CPProtocol extends Protocol {
             }
         }
 
-        if(count == 3)
-            throw new CookieRequestException();
+        if(count == 3) throw new CookieRequestException();
         if(resMsg instanceof CPCookieResponseMsg && !((CPCookieResponseMsg) resMsg).getSuccess()) {
             throw new CookieRequestException();
         }
@@ -270,7 +282,6 @@ class Cookie {
     public long getTimeOfCreation() {
         return timeOfCreation;
     }
-
     public int getCookieValue() { return cookieValue;}
 }
 

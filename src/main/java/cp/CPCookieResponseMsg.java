@@ -8,15 +8,11 @@ class CPCookieResponseMsg extends CPMsg {
     private boolean success;
     private int cookie;
 
-    protected CPCookieResponseMsg() {
-
-    }
+    protected CPCookieResponseMsg() { }
     protected CPCookieResponseMsg(boolean s) {
         this.success = s;
     }
-
     protected boolean getSuccess() {return this.success;}
-
     protected int getCookie() {return this.cookie;}
 
     /*

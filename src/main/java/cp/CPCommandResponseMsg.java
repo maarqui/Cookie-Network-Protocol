@@ -30,12 +30,36 @@ public class CPCommandResponseMsg extends CPMsg {
             "^" + CP_CMD_RES_HEADER + "\\s+(\\d{1,5})\\s+(ok|error)\\s+(\\d+)\\s*(.*)$"
     );
 
-
-     // Create method (not used but needed because of the inheritance)
     @Override
     protected void create(String sentence) {
         this.data = sentence;
         this.dataBytes = sentence.getBytes();
+    }
+
+    /**
+     * Create method:
+     * allows the creation of response messages from the server
+     */
+    public void create(int id, boolean success, String responseText) {
+        this.id = id;
+        this.success = success;
+        this.responseMessage = responseText;
+        this.length = responseText.length();
+        String status = success ? "ok" : "error";
+
+        // format: cp command_response <id> <success> <length> [message]
+        String dataPart = String.format("%s %d %s %d %s",
+                CP_CMD_RES_HEADER, this.id, status, this.length, this.responseMessage).trim();
+
+        // calculate checksum
+        CRC32 crc = new CRC32();
+        crc.update(dataPart.getBytes());
+        long checksum = crc.getValue();
+
+        // add checksum to response message
+        String finalMsg = dataPart + " " + checksum;
+
+        this.create(finalMsg);
     }
 
     /**
@@ -102,7 +126,7 @@ public class CPCommandResponseMsg extends CPMsg {
 
         return this;
     }
-    // Getters (needed for receive() in CPProtocol)
+
     public int getId() {
         return this.id;
     }
