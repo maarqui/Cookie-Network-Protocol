@@ -19,7 +19,8 @@ public class PhyProtocol extends Protocol {
 		try {
 			this.socket = new DatagramSocket(port);
 		} catch (SocketException e) {
-			e.printStackTrace();
+			System.err.println("Error: Could not open port " + port);
+			System.exit(1); // Ends execution if port is in use
 		}
 	}
 
