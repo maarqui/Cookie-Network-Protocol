@@ -19,7 +19,10 @@ public class CPCommandServer {
         CPProtocol cp;
         try {
             cp = new CPProtocol(phy, false);
+
+            cp.setCookieServer(InetAddress.getByName("localhost"), CPCookieServer.COOKIE_SERVER_PORT);
             System.out.println("--- Command Server Started on Port " + COMMAND_SERVER_PORT + " ---");
+            System.out.println("--- Linked to Cookie Server on Port " + CPCookieServer.COOKIE_SERVER_PORT + " ---");
         } catch (Exception e) {
             System.err.println("Failed to initialize CPProtocol");
             return;
@@ -28,7 +31,7 @@ public class CPCommandServer {
         // processing loop
         while (true) {
             try {
-                // receive() uses command_process() to process the commands received from users
+                // receive() uses commandProcess() to process the commands received from users
                 cp.receive();
             } catch (IOException e) {
                 System.out.println("IO Error during command processing: " + e.getMessage());
