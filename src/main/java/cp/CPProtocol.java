@@ -165,19 +165,23 @@ public class CPProtocol extends Protocol {
                 return null;
             }
 
-            // ramification of processing methods:
+            // ramification of server processing methods:
             if (this.role == cp_role.COOKIE) {
                 // cookie server processing method
                 if (cpmIn instanceof CPCookieRequestMsg) {
                     // process cookie
-                    cookie_process(cpmIn);
+                    cookieProcess(cpmIn);
+                }else if (cpmIn instanceof CPCookieVerificationRequestMsg){
+                    handleVerificationRequest(cpmIn);
                 }
 
             } else if (this.role == cp_role.COMMAND) {
                 // command server processing method
                 if (cpmIn instanceof CPCommandMsg) {
                     // process command
-                    command_process(cpmIn);
+                    commandProcess(cpmIn);
+                }else if  (cpmIn instanceof CPCookieVerificationResponseMsg) {
+                    handleVerificationResponse((CPCookieVerificationResponseMsg) cpmIn);
                 }
             }
             return cpmIn; // return the message
@@ -185,7 +189,7 @@ public class CPProtocol extends Protocol {
     }
 
     // Processing of the CookieRequestMsg
-    private void cookie_process(CPMsg cpmIn) throws IWProtocolException, IOException {
+    private void cookieProcess(CPMsg cpmIn) throws IWProtocolException, IOException {
         // Obtain client config:
         PhyConfiguration clientConfig = (PhyConfiguration) cpmIn.getConfiguration();
         CPCookieResponseMsg resMsg;
@@ -224,17 +228,18 @@ public class CPProtocol extends Protocol {
     }
 
     // Processing of commands received
-    private void command_process(CPMsg cpmIn) throws IOException, IWProtocolException {
+    private void commandProcess(CPMsg cpmIn) throws IOException, IWProtocolException {
         CPCommandMsg cmd = (CPCommandMsg) cpmIn;
+        // add message to the pending command list
+        this.pendingCommands.add(cmd);
 
-        // print when command is received
-        System.out.println("COMMAND RECEIVED: " + cmd.getCommand() + " " + cmd.getMessage());
+        // create new verification request for the cookie server
+        CPCookieVerificationRequestMsg vReq = new CPCookieVerificationRequestMsg();
+        vReq.create(cmd.getCookie());
 
-        CPCommandResponseMsg res = new CPCommandResponseMsg();
-        res.create(cmd.getId(), true, "Command executed");
-
-        // send response to client
-        this.PhyProto.send(new String(res.getDataBytes()), (PhyConfiguration) cmd.getConfiguration());
+        // send message to cookie server
+        this.PhyProto.send(new String(vReq.getDataBytes()), this.PhyConfigCookieServer);
+        System.out.println("VALIDATION SENT: Pending validation for cookie " + cmd.getCookie());
     }
 
     // Method for the client to request a cookie
@@ -268,6 +273,56 @@ public class CPProtocol extends Protocol {
          assert resMsg instanceof CPCookieResponseMsg;
          this.cookie = ((CPCookieResponseMsg)resMsg).getCookie();
     }
+
+    // handles cookie verification for cookie-server (input: client command request)
+    private void handleVerificationRequest(CPMsg cpmIn) throws IWProtocolException, IOException {
+        CPCookieVerificationRequestMsg vReq = (CPCookieVerificationRequestMsg) cpmIn;
+        PhyConfiguration senderConfig = (PhyConfiguration) vReq.getConfiguration();
+
+        boolean isValid = false;
+        long now = System.currentTimeMillis();
+        int cookieToVerify = vReq.getCookieValue();
+
+        // search for the cookie in the cookieMap to see if it has expired (TTL)
+        // defined time-to-live: 60s
+        final long COOKIE_LIFETIME = 60000;
+        for (Cookie c : cookieMap.values()) {
+            if (c.getCookieValue() == cookieToVerify) {
+                if ((now - c.getTimeOfCreation()) < COOKIE_LIFETIME) {
+                    isValid = true;
+                }
+                break;
+            }
+        }
+
+        // send response to command server
+        CPCookieVerificationResponseMsg vRes = new CPCookieVerificationResponseMsg();
+        vRes.create(isValid);
+        this.PhyProto.send(new String(vRes.getDataBytes()), senderConfig);
+    }
+
+    // handles cookie verification for command-server (input: cookie server response)
+    private void handleVerificationResponse(CPCookieVerificationResponseMsg vRes) throws IOException, IWProtocolException {
+        if (!pendingCommands.isEmpty()) {
+            // obtain the command to check
+            CPCommandMsg originalCmd = pendingCommands.remove(0);
+
+            CPCommandResponseMsg clientRes = new CPCommandResponseMsg();
+
+            if (vRes.isSuccess()) {
+                // if success return ok & execute
+                System.out.println("EXECUTION: " + originalCmd.getCommand() + " " + originalCmd.getMessage());
+                clientRes.create(originalCmd.getId(), true, "Command executed successfully");
+            } else {
+                // if fail inform client
+                clientRes.create(originalCmd.getId(), false, "Invalid or expired cookie");
+            }
+
+            // Enviar respuesta final al cliente original
+            this.PhyProto.send(new String(clientRes.getDataBytes()), (PhyConfiguration) originalCmd.getConfiguration());
+        }
+    }
+
 }
 
 class Cookie {
