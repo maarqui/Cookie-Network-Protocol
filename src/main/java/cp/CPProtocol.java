@@ -97,6 +97,7 @@ public class CPProtocol extends Protocol {
 
                     // validation of corrupt packages sent by PhyProtocol in case of exception
                     if (in == null) {
+                        count++;
                         continue;
                     }
                     // validate that the message is from the correct protocol (CP)
@@ -108,20 +109,22 @@ public class CPProtocol extends Protocol {
                     CPMsg cpmIn = new CPMsg();
                     cpmIn = (CPMsg) cpmIn.parse(in.getData());
 
-                    // verify if response is CPCommandResponseMsg
+                    // verify if response is CPCommandResponseMsg instance
                     if (!(cpmIn instanceof CPCommandResponseMsg response)) {
+                        count++;
                         continue; // not a command response, ignore
                     }
 
                     // verify ID if command is not null
                     if (lastSentCommand != null && response.getId() != this.lastSentCommand.getId()) {
+                        count++;
                         continue; // if incorrect ID wait for the correct response
                     }
 
                     // verify success
                     if (!response.isSuccess()) {
-                        count++;
-                        continue; // if not successful wait for the next iteration
+                        count++;  // if not successful wait for the next iteration and increment count
+                        continue;
                     }
 
                     // return to client
@@ -135,9 +138,10 @@ public class CPProtocol extends Protocol {
 
                 } catch (SocketTimeoutException e) {
                     // if timeout exception is reached increment count and continue
-                    // count++;
+                    count++;
                 } catch (IllegalMsgException e) {
                     // catches illegal message exceptions
+                    count++;
                 }
             }
             // if loop ends, throw server timeout

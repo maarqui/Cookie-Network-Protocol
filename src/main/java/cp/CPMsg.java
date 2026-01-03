@@ -31,7 +31,11 @@ class CPMsg extends Msg {
             parsedMsg = new CPCommandMsg();
         } else if(parts[1].startsWith(CPCommandResponseMsg.CP_CMD_RES_HEADER)) {
             parsedMsg = new CPCommandResponseMsg();
-        } else {
+        } else if (parts[1].startsWith(CPCookieVerificationRequestMsg.VERIFY_REQ_HEADER)){
+            parsedMsg = new CPCommandResponseMsg();
+        }else if(parts[1].startsWith(CPCookieVerificationResponseMsg.VERIFY_RES_HEADER)){
+            parsedMsg = new CPCommandResponseMsg();
+        }else {
             throw new IllegalMsgException();
         }
 
