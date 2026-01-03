@@ -36,7 +36,7 @@ public class CPProtocol extends Protocol {
         this.PhyProto = phyP;
         this.role = cp_role.CLIENT;
         this.cookie = -1;
-        this.id = 0;
+        this.id = -1;
     }
     // Constructor for servers
     public CPProtocol(PhyProtocol phyP, boolean isCookieServer) {
@@ -97,50 +97,55 @@ public class CPProtocol extends Protocol {
 
                     // validation of corrupt packages sent by PhyProtocol in case of exception
                     if (in == null) {
+                        System.out.println("attempt " + count + " - nothing received (null)");
                         count++;
                         continue;
                     }
+
+                    System.out.println("received data: " + in.getData());
+
                     // validate that the message is from the correct protocol (CP)
                     if (((PhyConfiguration) in.getConfiguration()).getPid() != proto_id.CP) {
+                        System.out.println("incorrect PID: " + ((PhyConfiguration) in.getConfiguration()).getPid());
                         continue; // package for a different protocol, ignore and keep waiting
                     }
 
                     // call parser
                     CPMsg cpmIn = new CPMsg();
                     cpmIn = (CPMsg) cpmIn.parse(in.getData());
+                    System.out.println("parsed class: " + cpmIn.getClass().getSimpleName());
 
                     // verify if response is CPCommandResponseMsg instance
                     if (!(cpmIn instanceof CPCommandResponseMsg response)) {
+                        System.out.println("Error - message is not instance of CPCommandResponseMsg");
                         count++;
                         continue; // not a command response, ignore
                     }
 
                     // verify ID if command is not null
                     if (lastSentCommand != null && response.getId() != this.lastSentCommand.getId()) {
+                        System.out.println("ID Mismatch - expected: " + lastSentCommand.getId() + " received: " + response.getId());
                         count++;
                         continue; // if incorrect ID wait for the correct response
                     }
 
                     // verify success
                     if (!response.isSuccess()) {
-                        count++;  // if not successful wait for the next iteration and increment count
-                        continue;
+                        System.out.println("server responded with ERROR: " + response.getResponseMessage());
+                        throw new CookieTimeoutException(response.getResponseMessage());
                     }
 
                     // return to client
-                    if (response.getResponseMessage().isEmpty()) {
-                        response.setData("Server: OK");
-                    } else {
-                        response.setData(response.getResponseMessage());
-                    }
-
+                    System.out.println("SUCCESS! returning answer.");
                     return response; // return exit response
 
                 } catch (SocketTimeoutException e) {
                     // if timeout exception is reached increment count and continue
+                    System.out.println("timeout in attempt " + count);
                     count++;
                 } catch (IllegalMsgException e) {
                     // catches illegal message exceptions
+                    System.out.println("corrupt message: " + e.getMessage());
                     count++;
                 }
             }
@@ -305,7 +310,7 @@ public class CPProtocol extends Protocol {
     private void handleVerificationResponse(CPCookieVerificationResponseMsg vRes) throws IOException, IWProtocolException {
         if (!pendingCommands.isEmpty()) {
             // obtain the command to check
-            CPCommandMsg originalCmd = pendingCommands.remove(0);
+            CPCommandMsg originalCmd = pendingCommands.removeFirst();
 
             CPCommandResponseMsg clientRes = new CPCommandResponseMsg();
 

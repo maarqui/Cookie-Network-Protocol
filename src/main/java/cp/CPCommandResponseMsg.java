@@ -19,15 +19,16 @@ public class CPCommandResponseMsg extends CPMsg {
     private long receivedChecksum;
     protected static final String CP_CMD_RES_HEADER = "command_response";
 
-     /* RegEx structure:
-     * ^command_response\\s+     : [Header]: starts with command_response and one (or more) spaces .
+    /* RegEx structure:
+     * ^command_response\\s+     : [Header]: starts with command_response and one (or more) spaces.
      * (\\d{1,5})\\s+            : [ID]: captures 1 to 5 digits (max 65535) followed by spaces.
      * (ok|error)\\s+            : [Success]: captures "ok" or "error", followed by spaces.
-     * (\\d+)\\s*                : [Length]: captures one or more digits (length), followed by 0 or spaces.
-     * (.*)$                     : [Message]: captures all characters (including spaces) until the end of the line.
+     * (\\d+)                    : [Length]: captures one or more digits (length).
+     * (?:\\s+(.*))?             : [Message]: optionally captures a space followed by characters until the end.
+     * \s*$                      : [End]: allows for optional trailing spaces before the end
      */
     private static final Pattern RESPONSE_PATTERN = Pattern.compile(
-            "^" + CP_CMD_RES_HEADER + "\\s+(\\d{1,5})\\s+(ok|error)\\s+(\\d+)\\s*(.*)$"
+            "^" + CP_CMD_RES_HEADER + "\\s+(\\d{1,5})\\s+(ok|error)\\s+(\\d+)(?:\\s+(.*?))?\\s*$"
     );
 
     @Override
@@ -86,9 +87,8 @@ public class CPCommandResponseMsg extends CPMsg {
         // checksum should be calculated over all message fields except the cp field
         CRC32 crc = new CRC32();
         crc.update(dataPart.getBytes());
-        long calculatedChecksum = crc.getValue();
 
-        if (this.receivedChecksum != calculatedChecksum) {
+        if (this.receivedChecksum != crc.getValue()) {
             // corrupt message
             throw new IllegalMsgException("Checksum mismatch: Message corrupted");
         }
@@ -102,19 +102,15 @@ public class CPCommandResponseMsg extends CPMsg {
         }
 
         // if 'dataPart' has the correct pattern, extract the fields.
-        try {
             // ID
             this.id = Integer.parseInt(matcher.group(1));
             // Success
             this.success = matcher.group(2).equals("ok");
             // Length
             this.length = Integer.parseInt(matcher.group(3));
-            // Message
-            this.responseMessage = matcher.group(4);
-        } catch (NumberFormatException e) {
-            // checks if ID & length are numbers as expected
-            throw new IllegalMsgException("Invalid number format in message (RegEx failed)");
-        }
+            // Message (optional group)
+            String msgGroup = matcher.group(4);
+            this.responseMessage = (msgGroup == null) ? "" : msgGroup;
 
         // Check if the lengths match:
         if (this.responseMessage.length() != this.length) {

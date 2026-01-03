@@ -18,29 +18,33 @@ class CPMsg extends Msg {
     @Override
     protected Msg parse(String sentence) throws IWProtocolException {
         CPMsg parsedMsg;
+        // validate "cp" prefix
         if(!sentence.startsWith(CP_HEADER)) throw new IllegalMsgException();
 
+        // separate prefix from body
         String[] parts = sentence.split("\\s+", 2);
         if(parts.length < 2) throw new IllegalMsgException();
 
-        if(parts[1].startsWith(CPCookieRequestMsg.CP_CREQ_HEADER)) {
-            parsedMsg = new CPCookieRequestMsg();
-        } else if(parts[1].startsWith(CPCookieResponseMsg.CP_CRES_HEADER)) {
-            parsedMsg = new CPCookieResponseMsg();
-        } else if(parts[1].startsWith(CPCommandMsg.CP_CMD_HEADER)) {
+        // check header
+        String body = parts[1];
+        if (body.startsWith(CPCommandResponseMsg.CP_CMD_RES_HEADER)) {
+            parsedMsg = new CPCommandResponseMsg();
+        } else if (body.startsWith(CPCommandMsg.CP_CMD_HEADER)) {
             parsedMsg = new CPCommandMsg();
-        } else if(parts[1].startsWith(CPCommandResponseMsg.CP_CMD_RES_HEADER)) {
-            parsedMsg = new CPCommandResponseMsg();
-        } else if (parts[1].startsWith(CPCookieVerificationRequestMsg.VERIFY_REQ_HEADER)){
-            parsedMsg = new CPCommandResponseMsg();
-        }else if(parts[1].startsWith(CPCookieVerificationResponseMsg.VERIFY_RES_HEADER)){
-            parsedMsg = new CPCommandResponseMsg();
-        }else {
-            throw new IllegalMsgException();
+        } else if (body.startsWith(CPCookieResponseMsg.CP_CRES_HEADER)) {
+            parsedMsg = new CPCookieResponseMsg();
+        } else if (body.startsWith(CPCookieRequestMsg.CP_CREQ_HEADER)) {
+            parsedMsg = new CPCookieRequestMsg();
+        } else if (body.startsWith(CPCookieVerificationResponseMsg.VERIFY_RES_HEADER)) {
+            parsedMsg = new CPCookieVerificationResponseMsg();
+        } else if (body.startsWith(CPCookieVerificationRequestMsg.VERIFY_REQ_HEADER)) {
+            parsedMsg = new CPCookieVerificationRequestMsg();
+        } else {
+            throw new IllegalMsgException("Unknown message header: " + body);
         }
 
-        parsedMsg = (CPMsg) parsedMsg.parse(parts[1]);
-        return parsedMsg;
+        // return parse to the corresponding class
+        return (CPMsg) parsedMsg.parse(body);
     }
 
 }
