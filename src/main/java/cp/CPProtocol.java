@@ -13,7 +13,7 @@ import java.util.HashMap;
 import java.util.Random;
 
 public class CPProtocol extends Protocol {
-    private static final int CP_TIMEOUT = 3000;
+    private static final int CP_TIMEOUT = 2000;
     private static final int CP_HASHMAP_SIZE = 20;
     private int cookie;
     private int id;
@@ -36,6 +36,7 @@ public class CPProtocol extends Protocol {
         this.PhyProto = phyP;
         this.role = cp_role.CLIENT;
         this.cookie = -1;
+        this.id = 0;
     }
     // Constructor for servers
     public CPProtocol(PhyProtocol phyP, boolean isCookieServer) {
@@ -69,7 +70,7 @@ public class CPProtocol extends Protocol {
         this.id++;
         // manage overflow
         if (this.id > 65535) {
-            this.id = 1; // restart in case the max is reached
+            this.id = 0; // restart in case the max is reached
         }
 
         // create CPCommandMsg object to create the message
@@ -88,11 +89,6 @@ public class CPProtocol extends Protocol {
         // Ramification of server/client logics:
         if(this.role == cp_role.CLIENT) {
             // Client logic:
-            /* if (this.lastSentCommand == null) {
-                // not supposed to happen if send() is called before
-                throw new NoNextStateException("receive() called before send()");
-            }*/
-
             int count = 0;
             while (count < 3) {
                 try {
@@ -119,13 +115,13 @@ public class CPProtocol extends Protocol {
 
                     // verify ID if command is not null
                     if (lastSentCommand != null && response.getId() != this.lastSentCommand.getId()) {
-                        continue; // If incorrect ID wait for the correct response
+                        continue; // if incorrect ID wait for the correct response
                     }
 
                     // verify success
                     if (!response.isSuccess()) {
-                        // if the server returns error, throw exception
-                        throw new IllegalCommandException("Server rejected command: " + response.getResponseMessage());
+                        count++;
+                        continue; // if not successful wait for the next iteration
                     }
 
                     // return to client
@@ -139,13 +135,13 @@ public class CPProtocol extends Protocol {
 
                 } catch (SocketTimeoutException e) {
                     // if timeout exception is reached increment count and continue
-                    count += 1;
+                    // count++;
                 } catch (IllegalMsgException e) {
                     // catches illegal message exceptions
                 }
             }
             // if loop ends, throw server timeout
-            throw new CookieTimeoutException("Server timeout (3 attempts of 3s each)");
+            throw new CookieTimeoutException("Server timeout");
         }else {
             // Server logic:
             Msg in = this.PhyProto.receive();

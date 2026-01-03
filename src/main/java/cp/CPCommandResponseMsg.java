@@ -71,9 +71,7 @@ public class CPCommandResponseMsg extends CPMsg {
         // 'sentence' is the string without the "cp " prefix
         // Separate checksum:
         int checksumSeparatorIndex = sentence.lastIndexOf(' ');
-        if (checksumSeparatorIndex == -1) {
-            throw new IllegalMsgException("Invalid format: No checksum found");
-        }
+        if (checksumSeparatorIndex == -1) throw new IllegalMsgException("Invalid format: No checksum found");
 
         String dataPart = sentence.substring(0, checksumSeparatorIndex);
         String checksumStr = sentence.substring(checksumSeparatorIndex + 1);
