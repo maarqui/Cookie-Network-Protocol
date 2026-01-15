@@ -4,7 +4,7 @@
 
 **subtask 1.1** - Document protocol stack initialization and the cookie request method all the way until a cookie is available to the client or the request got rejected.
 
-![v.2](diagrams/cookie-protocol-diagram-v2.png)
+![v.2](diagrams/cookie-protocol-diagram-v3.png)
 
 **subtask 1.2** - Completion of client methods:
 - Completion of `send()` method in CPProtocol.
@@ -50,4 +50,5 @@
 - enhancement of `receive()` (CPProtocol) to process validation request messages.
 - check if clients exist in the HashMap, if cookie value matches & lifetime is valid.
 - send appropriate response to command server.
+
 
